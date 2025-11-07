@@ -71,7 +71,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           cd openssl
-          perl Configure ${{ matrix.target }} shared --prefix=%cd%\..\install
+          perl Configure ${{ matrix.target }} shared --prefix=${{ github.workspace }}\install
 
       - name: Build and install (Windows)
         if: runner.os == 'Windows'
@@ -90,14 +90,20 @@ jobs:
             export AR=${{ matrix.toolchain }}-ar
             export RANLIB=${{ matrix.toolchain }}-ranlib
           fi
-          ./Configure ${{ matrix.target }} shared --prefix=$PWD/../install
+
+          # 强制开启动态库构建
+          ./Configure ${{ matrix.target }} shared -fPIC --prefix=$PWD/../install
 
       - name: Build and install (Linux)
         if: runner.os == 'Linux'
         run: |
           cd openssl
+          make clean
           make -j$(nproc)
           make install_sw
+
+          echo "=== Installed files ==="
+          find ../install -type f -name "*.so*" || echo "No .so found"
 
       # ---------- Package ----------
       - name: Package artifacts

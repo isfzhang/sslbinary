@@ -1,4 +1,4 @@
-name: Build OpenSSL 1.1.1 (Win/Linux x86/x64/arm64)
+name: Build OpenSSL 1.1.1 (Shared / Multi-Platform)
 
 on:
   workflow_dispatch:
@@ -54,23 +54,24 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y build-essential perl make wget tar
+          sudo apt-get install -y build-essential perl make wget tar curl
           if [ "${{ matrix.cross }}" = "true" ]; then
             sudo apt-get install -y gcc-${{ matrix.toolchain }} g++-${{ matrix.toolchain }}
           fi
 
       - name: Download OpenSSL source
         run: |
-          wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O openssl.tar.gz
+          curl -L -o openssl.tar.gz https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
           tar -xzf openssl.tar.gz
           mv openssl-${OPENSSL_VERSION} openssl
+        shell: bash
 
       # ---------- Windows ----------
       - name: Configure OpenSSL (Windows)
         if: runner.os == 'Windows'
         run: |
           cd openssl
-          perl Configure ${{ matrix.target }} no-shared --prefix=%cd%\..\install
+          perl Configure ${{ matrix.target }} shared --prefix=%cd%\..\install
 
       - name: Build and install (Windows)
         if: runner.os == 'Windows'
@@ -89,7 +90,7 @@ jobs:
             export AR=${{ matrix.toolchain }}-ar
             export RANLIB=${{ matrix.toolchain }}-ranlib
           fi
-          ./Configure ${{ matrix.target }} no-shared --prefix=$PWD/../install
+          ./Configure ${{ matrix.target }} shared --prefix=$PWD/../install
 
       - name: Build and install (Linux)
         if: runner.os == 'Linux'
@@ -103,17 +104,17 @@ jobs:
         run: |
           cd install
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            7z a ../openssl-${OPENSSL_VERSION}-${{ matrix.name }}.zip *
+            7z a ../openssl-${OPENSSL_VERSION}-${{ matrix.name }}-shared.zip *
           else
-            tar -czf ../openssl-${OPENSSL_VERSION}-${{ matrix.name }}.tar.gz *
+            tar -czf ../openssl-${OPENSSL_VERSION}-${{ matrix.name }}-shared.tar.gz *
           fi
         shell: bash
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}
+          name: openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}-shared
           path: |
-            openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}.tar.gz
-            openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}.zip
+            openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}-shared.tar.gz
+            openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}-shared.zip
           if-no-files-found: ignore

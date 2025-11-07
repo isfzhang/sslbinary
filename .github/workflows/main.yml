@@ -67,6 +67,12 @@ jobs:
         shell: bash
 
       # ---------- Windows ----------
+      - name: Setup MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+          
       - name: Configure OpenSSL (Windows)
         if: runner.os == 'Windows'
         run: |

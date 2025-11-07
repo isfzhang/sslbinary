@@ -1,0 +1,119 @@
+name: Build OpenSSL 1.1.1 (Win/Linux x86/x64/arm64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ---- Windows ----
+          - name: windows-x64
+            os: windows-latest
+            arch: x64
+            target: VC-WIN64A
+          - name: windows-x86
+            os: windows-latest
+            arch: x86
+            target: VC-WIN32
+
+          # ---- Linux ----
+          - name: linux-x86
+            os: ubuntu-latest
+            arch: x86
+            target: linux-x86
+            cross: true
+            toolchain: i686-linux-gnu
+          - name: linux-arm64
+            os: ubuntu-latest
+            arch: arm64
+            target: linux-aarch64
+            cross: true
+            toolchain: aarch64-linux-gnu
+
+    env:
+      OPENSSL_VERSION: 1.1.1w
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install strawberryperl nasm make -y
+
+      - name: Install build tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y build-essential perl make wget tar
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            sudo apt-get install -y gcc-${{ matrix.toolchain }} g++-${{ matrix.toolchain }}
+          fi
+
+      - name: Download OpenSSL source
+        run: |
+          wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O openssl.tar.gz
+          tar -xzf openssl.tar.gz
+          mv openssl-${OPENSSL_VERSION} openssl
+
+      # ---------- Windows ----------
+      - name: Configure OpenSSL (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd openssl
+          perl Configure ${{ matrix.target }} no-shared --prefix=%cd%\..\install
+
+      - name: Build and install (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd openssl
+          nmake
+          nmake install_sw
+
+      # ---------- Linux ----------
+      - name: Configure OpenSSL (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd openssl
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            export CC=${{ matrix.toolchain }}-gcc
+            export AR=${{ matrix.toolchain }}-ar
+            export RANLIB=${{ matrix.toolchain }}-ranlib
+          fi
+          ./Configure ${{ matrix.target }} no-shared --prefix=$PWD/../install
+
+      - name: Build and install (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd openssl
+          make -j$(nproc)
+          make install_sw
+
+      # ---------- Package ----------
+      - name: Package artifacts
+        run: |
+          cd install
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            7z a ../openssl-${OPENSSL_VERSION}-${{ matrix.name }}.zip *
+          else
+            tar -czf ../openssl-${OPENSSL_VERSION}-${{ matrix.name }}.tar.gz *
+          fi
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}
+          path: |
+            openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}.tar.gz
+            openssl-${{ env.OPENSSL_VERSION }}-${{ matrix.name }}.zip
+          if-no-files-found: ignore

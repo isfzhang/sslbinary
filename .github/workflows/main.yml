@@ -2,10 +2,7 @@ name: Build OpenSSL 1.1.1 (Shared / Multi-Platform)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-  pull_request:
-
+  
 jobs:
   build:
     name: Build on ${{ matrix.name }}

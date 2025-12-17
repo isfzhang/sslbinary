@@ -1,0 +1,37 @@
+name: Build Redis 6.2.20 Linux Binary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential tcl
+
+      - name: Download Redis 6.2.20
+        run: |
+          wget https://download.redis.io/releases/redis-6.2.20.tar.gz
+          tar -xzf redis-6.2.20.tar.gz
+
+      - name: Build Redis
+        run: |
+          cd redis-6.2.20
+          make -j$(nproc)
+
+      - name: Collect binaries
+        run: |
+          mkdir -p redis-bin
+          cp redis-6.2.20/src/redis-server redis-bin/
+          cp redis-6.2.20/src/redis-cli redis-bin/
+          cp redis-6.2.20/src/redis-benchmark redis-bin/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: redis-6.2.20-linux-x86_64
+          path: redis-bin
